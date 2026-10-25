@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" fill="none" role="img" aria-labelledby="title description">
+  <title id="title">OhMyMC Launcher — 一个起点，无限世界。</title>
+  <desc id="description">暖白与苔绿的原创像素地形插画。小核心、真实插件、纯 WebUI；由 Go、moejs 和 MyGO 构建。</desc>
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1200" y2="440" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4F6EF"/>
+      <stop offset="1" stop-color="#E7EEDF"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="810" y1="56" x2="1020" y2="380" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D7E3CB"/>
+      <stop offset="1" stop-color="#E7EEDF" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" stroke="#43684C" stroke-opacity=".055"/>
+    </pattern>
+    <clipPath id="frame"><rect width="1200" height="440" rx="24"/></clipPath>
+  </defs>
+  <g clip-path="url(#frame)">
+    <rect width="1200" height="440" fill="url(#paper)"/>
+    <rect x="630" width="570" height="440" fill="url(#grid)"/>
+    <circle cx="947" cy="215" r="169" fill="url(#sky)"/>
+    <path d="M649 336H699V304H749V272H799V240H849V208H899V176H949V144H999V112H1049V80H1099" stroke="#93AA86" stroke-opacity=".35" stroke-dasharray="4 6"/>
+
+    <g font-family="'Segoe UI', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif">
+      <g transform="translate(56 48)">
+        <rect width="32" height="32" rx="8" fill="#304E3C"/>
+        <path d="M8 12L16 8L24 12L16 16L8 12Z" fill="#D7E5B3"/>
+        <path d="M8 12V21L16 25V16L8 12Z" fill="#93B979"/>
+        <path d="M16 16V25L24 21V12L16 16Z" fill="#BDD39B"/>
+        <text x="45" y="22" fill="#304E3C" font-size="17" font-weight="700" letter-spacing="2">OHMYMC</text>
+        <path d="M165 6V26" stroke="#B8C7AF"/>
+        <text x="182" y="21" fill="#6B7C63" font-size="12" letter-spacing="2">YOUR WORLD, YOUR WAY.</text>
+      </g>
+
+      <text x="53" y="172" fill="#253F31" font-size="59" font-weight="700" letter-spacing="1">一个起点，</text>
+      <text x="53" y="246" fill="#527F58" font-size="59" font-weight="700" letter-spacing="1">无限世界。</text>
+      <text x="57" y="292" fill="#65755E" font-size="18" letter-spacing="2">小核心 · 真实插件 · 纯 WebUI</text>
+
+      <g transform="translate(56 344)" font-size="11" font-weight="600" letter-spacing="1.2">
+        <rect width="112" height="32" rx="16" fill="#E2E9D9"/>
+        <text x="18" y="21" fill="#486345">CORE / GO</text>
+        <rect x="122" width="150" height="32" rx="16" fill="#E2E9D9"/>
+        <text x="139" y="21" fill="#486345">PLUGINS / MOEJS</text>
+        <rect x="282" width="158" height="32" rx="16" fill="#E2E9D9"/>
+        <text x="299" y="21" fill="#486345">DESKTOP / MYGO</text>
+      </g>
+    </g>
+
+    <!-- Original isometric terrain: each face is drawn locally, without raster assets. -->
+    <path d="M752 337L927 251L1127 350L952 414L752 337Z" fill="#66815B" opacity=".09"/>
+    <g stroke-linejoin="round">
+      <!-- Lower terrace -->
+      <path d="M715 266L865 191L1065 291L915 366L715 266Z" fill="#A7BE85"/>
+      <path d="M715 266L915 366V398L715 298V266Z" fill="#A49C77"/>
+      <path d="M915 366L1065 291V323L915 398V366Z" fill="#8A8B64"/>
+      <path d="M715 266L915 366V378L715 278V266Z" fill="#7D9A61"/>
+      <path d="M915 366L1065 291V303L915 378V366Z" fill="#627E4F"/>
+      <path d="M765 291L915 216M815 316L965 241M865 341L1015 266M765 241L965 341M815 216L1015 316" stroke="#D9E5BF" stroke-opacity=".45"/>
+      <path d="M742 285V296L764 307V296L742 285ZM813 322V333L836 344V333L813 322ZM868 351V363L891 374V363L868 351Z" fill="#BBB18B"/>
+      <path d="M941 365V376L965 364V353L941 365ZM1013 330V341L1038 328V317L1013 330Z" fill="#747953"/>
+
+      <!-- Raised hill -->
+      <path d="M765 201L865 151L1015 226L915 276L765 201Z" fill="#B9CE96"/>
+      <path d="M765 201L915 276V326L765 251V201Z" fill="#97A370"/>
+      <path d="M915 276L1015 226V276L915 326V276Z" fill="#7E905E"/>
+      <path d="M765 201L915 276V289L765 214V201Z" fill="#88A86B"/>
+      <path d="M915 276L1015 226V239L915 289V276Z" fill="#6F9256"/>
+      <path d="M815 226L915 176M865 251L965 201M815 176L965 251" stroke="#DFEAC5" stroke-opacity=".55"/>
+      <path d="M791 232V245L814 257V244L791 232ZM861 271V284L885 296V283L861 271Z" fill="#A9B680"/>
+
+      <!-- A small block-built tree -->
+      <path d="M850 151L866 143L882 151L866 159L850 151Z" fill="#A3956F"/>
+      <path d="M850 151L866 159V215L850 207V151Z" fill="#8A7F59"/>
+      <path d="M866 159L882 151V207L866 215V159Z" fill="#706C48"/>
+      <path d="M806 116L866 86L926 116L866 146L806 116Z" fill="#7EAA6B"/>
+      <path d="M806 116L866 146V180L806 150V116Z" fill="#577F50"/>
+      <path d="M866 146L926 116V150L866 180V146Z" fill="#416B45"/>
+      <path d="M826 89L866 69L906 89L866 109L826 89Z" fill="#A0BE7E"/>
+      <path d="M826 89L866 109V133L826 113V89Z" fill="#759B5E"/>
+      <path d="M866 109L906 89V113L866 133V109Z" fill="#638850"/>
+      <path d="M816 132L831 139V152L816 145V132ZM875 150L891 142V155L875 163V150Z" fill="#93B578" opacity=".4"/>
+
+      <!-- A detachable block suggests plugin contributions -->
+      <path d="M1040 184L1074 167L1108 184L1074 201L1040 184Z" fill="#D9C993"/>
+      <path d="M1040 184L1074 201V235L1040 218V184Z" fill="#B7A66F"/>
+      <path d="M1074 201L1108 184V218L1074 235V201Z" fill="#978B59"/>
+      <path d="M1023 230L1010 237M1035 241L1022 248" stroke="#90A37E" stroke-width="2" stroke-linecap="round"/>
+      <path d="M1074 142V126M1066 134H1082M746 164V152M740 158H752" stroke="#9FAE7F" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- Meadow details -->
+      <path d="M946 235V219M946 228L940 222M946 225L952 219M788 278V264M788 271L782 266M788 273L795 267" stroke="#60824D" stroke-width="3" stroke-linecap="round"/>
+      <path d="M987 303V291" stroke="#708B55" stroke-width="3"/>
+      <rect x="983" y="285" width="8" height="8" fill="#E5D192"/>
+    </g>
+    <rect x=".5" y=".5" width="1199" height="439" rx="23.5" stroke="#D4DDCA"/>
+  </g>
+</svg>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="api-token" content="__API_TOKEN__">
+  <meta name="description" content="OhMyMC · 由插件驱动的本地 Minecraft 启动工作区">
+  <title>OhMyMC · 版本库</title>
+  <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳至主要内容</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="#library" aria-label="OhMyMC 版本库">
+        <img src="./assets/mark.svg" width="40" height="40" alt="">
+        <span><strong>OhMyMC<span class="brand-dot">.</span></strong><small>你的世界，由此开启</small></span>
+      </a>
+      <div class="sidebar-section-label">工作空间 <span>WORKSPACE</span></div>
+      <nav id="workspace-nav" class="nav-list" aria-label="工作空间">
+        <a class="nav-link is-active" href="#library" data-page="library" aria-current="page"><span class="nav-icon" data-icon="grid"></span><span class="nav-label">版本库</span><span class="nav-count" id="version-count">—</span></a>
+        <a class="nav-link" href="#tasks" data-page="tasks"><span class="nav-icon" data-icon="activity"></span><span class="nav-label">下载与任务</span><span class="nav-count" id="task-count" hidden>0</span></a>
+        <a class="nav-link" href="#logs" data-page="logs"><span class="nav-icon" data-icon="terminal"></span><span class="nav-label">运行日志</span><span class="nav-running" id="running-dot" hidden aria-label="有版本正在运行"></span></a>
+      </nav>
+      <div class="sidebar-section-label extension-label">插件扩展 <span>EXTENSIONS</span></div>
+      <nav id="panel-nav" class="nav-list" aria-label="插件面板"></nav>
+      <p id="panel-nav-hint" class="sidebar-hint">连接后载入插件面板</p>
+      <nav class="nav-list" aria-label="插件管理">
+        <a class="nav-link" href="#plugins" data-page="plugins"><span class="nav-icon" data-icon="puzzle"></span><span class="nav-label">插件管理</span><span class="nav-icon nav-end" data-icon="chevron-right"></span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-note"><span class="note-rule"></span><p>轻盈的启动器。<br>属于你的游戏方式。</p><span class="note-coordinate">BUILD YOUR OWN WAY</span></div>
+        <button id="identity-button" class="identity-card" type="button" aria-label="查看本地离线身份说明">
+          <span class="identity-avatar" data-icon="user"></span><span class="identity-copy"><strong>本地离线身份</strong><small>无需登录 · 本地启动</small></span><span class="identity-info" data-icon="info"></span>
+        </button>
+        <div class="sidebar-meta"><span id="app-version">OhMyMC</span><span id="platform-label">LOCAL FIRST</span></div>
+      </div>
+    </aside>
+    <main id="main" class="main" tabindex="-1">
+      <header class="page-header">
+        <div class="page-heading"><div id="page-eyebrow" class="eyebrow">YOUR COLLECTION</div><div class="page-title-row"><h1 id="page-title" tabindex="-1">版本库</h1><span id="page-title-badge" class="title-badge" hidden></span></div><p id="page-description">把每一次出发，收纳在这里。</p></div>
+        <div class="header-tools"><span id="connection-status" class="connection-status is-pending" role="status"><span class="status-dot"></span><span>正在连接</span></span><div id="page-actions" class="page-actions"></div></div>
+      </header>
+      <section id="connection-alert" class="connection-alert" role="alert" hidden></section>
+      <div id="view" class="view">
+        <div class="library-toolbar"><div class="section-caption">全部版本 <span class="count-chip">—</span></div></div>
+        <section class="empty-library surface"><div class="empty-art"><img src="./assets/world.svg" width="360" height="300" alt=""><span class="art-caption">A LITTLE SPACE. ENDLESS WORLDS.</span></div><div class="empty-copy"><div class="eyebrow">一个新的起点</div><h2>你的下一个世界，<br>从这里开始。</h2><p>正在连接本地启动器，读取版本与插件。<br>已有的游戏文件会留在原来的位置。</p><div class="inline-loading"><span class="spinner"></span>正在读取工作空间…</div></div></section>
+      </div>
+      <footer class="workspace-footer"><span><span class="footer-mark"></span>本地文件 · 自由扩展</span><span id="workspace-location">OhMyMC / MINECRAFT WORKSPACE</span></footer>
+    </main>
+  </div>
+  <dialog id="app-dialog" class="app-dialog" aria-labelledby="dialog-title"></dialog>
+  <section id="notifications" class="notifications" aria-label="操作通知" aria-live="polite" aria-atomic="false"></section>
+  <noscript><div class="noscript-error">OhMyMC 需要 JavaScript 才能连接启动器。请启用 JavaScript 后重新打开。</div></noscript>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

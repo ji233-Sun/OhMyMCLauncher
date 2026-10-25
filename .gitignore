@@ -1,0 +1,13 @@
+/dist/
+/dev-data/
+/.minecraft/
+*.exe
+*.test
+*.out
+*.log
+.DS_Store
+
+# Local credentials; a sanitized example may be committed explicitly.
+.env
+.env.*
+!.env.example

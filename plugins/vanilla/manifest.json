@@ -1,0 +1,13 @@
+{
+  "apiVersion": 1,
+  "id": "ohmymc.vanilla",
+  "name": "原版游戏下载",
+  "version": "1.0.0",
+  "author": "OhMyMC",
+  "description": "从 Mojang 官方源获取原版游戏、依赖库及资源，校验完整性后加入版本库。",
+  "entry": "main.js",
+  "permissions": ["network.minecraft", "files.minecraft", "versions.add"],
+  "actions": {"catalog": {}, "install": {"background": true}},
+  "panels": [{"id": "download", "title": "下载游戏", "description": "原版，从这里开始。正式版与快照，直接来自 Mojang。", "scope": "global", "kind": "catalog", "loadAction": "catalog", "submitAction": "install", "submitLabel": "下载并安装"}],
+  "hooks": []
+}
