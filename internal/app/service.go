@@ -16,11 +16,13 @@ import (
 const Version = "0.1.0"
 
 type Service struct {
-	Store     *core.Store
-	Processes *core.Processes
-	Plugins   *plugins.Manager
-	Jobs      *jobs.Manager
-	ops       sync.Mutex
+	Store      *core.Store
+	Processes  *core.Processes
+	Plugins    *plugins.Manager
+	Jobs       *jobs.Manager
+	ops        sync.Mutex
+	scanMu     sync.RWMutex
+	scanIssues []core.ScanIssue
 }
 
 func New(root string) (*Service, error) {
@@ -37,27 +39,48 @@ func NewWithMinecraftRoot(root, minecraftRoot string) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{Store: store, Processes: core.NewProcesses(store.Root()), Plugins: p, Jobs: j}, nil
+	scan, scanErr := store.Discover(false)
+	if scanErr != nil {
+		scan.Issues = append(scan.Issues, core.ScanIssue{Message: scanErr.Error()})
+	}
+	return &Service{Store: store, Processes: core.NewProcesses(store.Root()), Plugins: p, Jobs: j, scanIssues: scan.Issues}, nil
 }
 func (s *Service) Close() { s.Jobs.Close() }
 
 type State struct {
-	Versions      []core.Version `json:"versions"`
-	Plugins       []plugins.Info `json:"plugins"`
-	Jobs          []jobs.Job     `json:"jobs"`
-	Processes     []core.Process `json:"processes"`
-	DataRoot      string         `json:"dataRoot"`
-	MinecraftRoot string         `json:"minecraftRoot"`
-	Platform      string         `json:"platform"`
-	AppVersion    string         `json:"appVersion"`
+	Versions      []core.Version     `json:"versions"`
+	Plugins       []plugins.Info     `json:"plugins"`
+	Jobs          []jobs.Job         `json:"jobs"`
+	Processes     []core.Process     `json:"processes"`
+	DataRoot      string             `json:"dataRoot"`
+	MinecraftRoot string             `json:"minecraftRoot"`
+	Platform      string             `json:"platform"`
+	AppVersion    string             `json:"appVersion"`
+	Memory        *core.MemoryStatus `json:"memory,omitempty"`
+	PlayerName    string             `json:"playerName"`
+	ProfileError  string             `json:"profileError,omitempty"`
+	ScanIssues    []core.ScanIssue   `json:"scanIssues"`
 }
 
 func (s *Service) State() State {
-	return State{
+	s.scanMu.RLock()
+	issues := append([]core.ScanIssue{}, s.scanIssues...)
+	s.scanMu.RUnlock()
+	state := State{
 		Versions: s.Store.List(), Plugins: s.Plugins.List(), Jobs: s.Jobs.List(),
 		Processes: s.Processes.List(), DataRoot: s.Store.Root(),
 		MinecraftRoot: s.Store.MinecraftRoot(), Platform: runtime.GOOS, AppVersion: Version,
+		ScanIssues: issues,
 	}
+	if memory, err := core.SystemMemory(); err == nil {
+		state.Memory = &memory
+	}
+	name, err := s.Plugins.PlayerName(context.Background())
+	state.PlayerName = name
+	if err != nil {
+		state.ProfileError = err.Error()
+	}
+	return state
 }
 
 type request struct {
@@ -86,6 +109,21 @@ func (s *Service) Invoke(ctx context.Context, method string, payload map[string]
 	switch method {
 	case "state.get":
 		return s.State(), nil
+	case "versions.scan":
+		s.ops.Lock()
+		defer s.ops.Unlock()
+		for _, job := range s.Jobs.List() {
+			if job.Status == "running" || job.Status == "queued" {
+				return nil, errors.New("请等待安装任务完成后重新识别，避免登记尚未下载完整的版本")
+			}
+		}
+		scan, err := s.Store.Discover(true)
+		if err == nil {
+			s.scanMu.Lock()
+			s.scanIssues = scan.Issues
+			s.scanMu.Unlock()
+		}
+		return scan, err
 	case "versions.import":
 		if p.Path == "" {
 			return nil, errors.New("请选择要导入的目录")
@@ -152,6 +190,8 @@ func (s *Service) Invoke(ctx context.Context, method string, payload map[string]
 		defer s.ops.Unlock()
 		return nil, s.Plugins.Reload()
 	case "plugins.invoke":
+		s.ops.Lock()
+		defer s.ops.Unlock()
 		return s.Plugins.Invoke(ctx, p.ID, p.Action, p.VersionID, p.Data)
 	case "jobs.cancel":
 		return nil, s.Jobs.Cancel(p.ID)

@@ -114,6 +114,11 @@ export function invoke(action, input) { /* 返回 JSON 值，失败时 throw */ 
 
 UI 提供搜索、正式版/快照筛选与安装确认。submit 收到 `{version: 选中项ID, name: 用户名称, isolate: 布尔值}`。下载动作必须使用后台任务，以便显示进度/取消。
 
+### launch / profiles
+
+- `kind: "launch"`、`scope: "version"` 使用专用启动配置组件，字段为 `javaPath/minMemoryMB/maxMemoryMB/width/height/fullscreen/jvmArgs/gameArgs`，类型与普通 form 相同。加载/提交使用 `{values}`，另包含布尔值 `values.useRecommendedMemory`。load/save 可返回 `memory` 和 `memoryError`；UI 提供推荐锁定、内存区间图、内存与窗口尺寸预设，不按插件 ID 分支。推荐模式的最终值必须由插件/宿主校验，不能信任已禁用输入框中的旧值。
+- `kind: "profiles"`、`scope: "global"` 使用玩家档案组件。除了 `loadAction/submitAction`，还须指定已声明的 `selectAction/removeAction`。load 返回 `{profiles:[{id,name,uuid}],selectedId}`；submit 收到 `{name}`，select/remove 收到 `{id}`，各动作返回更新后的同一结构。UI 不执行插件 HTML。内置实现最多 64 个离线档案，名称为 1–16 位字母、数字、下划线，不区分大小写判重；创建即选中，删除当前档案后选择剩余第一个，禁止移除最后一个。
+
 插件不提供 HTML/DOM/远程脚本，文本由宿主转义渲染。若以后添加 Mod 列表、截图网格等，需先扩展带版本号的声明式组件协议，而不是绕过桥接加载任意页面。
 
 ## 5. 宿主能力
@@ -123,6 +128,8 @@ UI 提供搜索、正式版/快照筛选与安装确认。submit 收到 `{versio
 | 方法 | 权限 | 参数 / 结果 |
 | --- | --- | --- |
 | `system.platform` | 无 | 返回 `{os, arch, version, bits}`；`os` 是 `windows/linux/osx`。 |
+| `system.memory` | `system.memory` | 返回 `{totalMB,availableMB,usedMB,recommendedMinMB,recommendedMaxMB}`，单位 MiB；Windows 读取物理内存状态，当前不支持的平台抛错，不伪造容量。 |
+| `identity.offline` | `identity.configure` | `{name}`；校验离线名称，返回 `{name,uuid}`，UUID 与核心实际启动使用的离线 UUID 一致。 |
 | `progress` | 无 | `{phase, done, total}`；更新当前后台任务，普通动作时无效果。 |
 | `net.json` | `network.minecraft` | `{url, sha1?}`；受限 HTTPS JSON 请求，可校验 SHA-1，返回解码后的 JSON。 |
 | `files.download` | `network.minecraft` + `files.minecraft` | `{files:[{path,url,sha1,size}], phase}`；8 个 worker，每个文件最多尝试 3 次，成功后原子提交，已有正确缓存复用。 |
@@ -130,6 +137,8 @@ UI 提供搜索、正式版/快照筛选与安装确认。submit 收到 `{versio
 | `files.writeJSON` | `files.minecraft` | `{path, value}`；只能写 `.json`，原子提交。 |
 | `storage.get` | `storage.version` | 当前 **实例 ID + 插件 ID** 的 JSON 配置，缺失时 `{}`。 |
 | `storage.set` | `storage.version` | payload 本身就是配置，≤64 KiB，不可选择别的插件或版本的存储空间。 |
+| `storage.global.get` | `storage.global` | 当前插件 ID 独立的全局 JSON 配置，缺失时 `{}`，不需要 versionId。 |
+| `storage.global.set` | `storage.global` | payload 本身就是全局配置，≤64 KiB，不能选择别的插件的存储空间。 |
 | `launch.defaults` | `launch.configure` | 返回核心默认 `LaunchOptions`。 |
 | `launch.validate` | `launch.configure` | payload 为完整 `LaunchOptions`；校验后返回 null，失败抛错。 |
 | `versions.allocate` | `versions.add` | `{version, name, isolate}`；本次调用分配一个待登记实例，返回 `{id,gamePath}`，尚不加入版本库。 |
@@ -174,5 +183,7 @@ invoke('launch.configure', {versionId, version, options})
 ```
 
 `jvmArgs` / `gameArgs` 为一行一个参数，不经过 shell。**这不意味着可安全接收恶意参数**：JVM agent、Java 路径等可以执行本机代码。只授予可信插件此权限。
+
+玩家身份插件声明 `permissions:["storage.global","identity.configure"]` 和 `hooks:["identity.configure"]`，钩子调用 `invoke('identity.configure', {})` 并返回 `{playerName:"Alex"}`。宿主在所有 `launch.configure` 结束后运行身份钩子，仅接收玩家名称，再由核心校验；命令预览与实际启动走相同逻辑。身份插件禁用时使用核心的 `Player`，已保存档案不清除。此协议目前仅提供离线名称，不提供在线身份令牌或 Microsoft 登录。
 
 当前不提供 `afterExit`、长期后台服务、跨插件消息、任意目录/进程/账户令牌访问。新能力应在 Go 宿主实现权限检查与 DTO，升级协议后再开放。

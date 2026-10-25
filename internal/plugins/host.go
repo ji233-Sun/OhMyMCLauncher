@@ -56,6 +56,25 @@ func (i *invocation) host(method string, b json.RawMessage) (any, error) {
 	switch method {
 	case "system.platform":
 		return core.CurrentPlatform(), nil
+	case "system.memory":
+		if err := i.require("system.memory"); err != nil {
+			return nil, err
+		}
+		return core.SystemMemory()
+	case "identity.offline":
+		if err := i.require("identity.configure"); err != nil {
+			return nil, err
+		}
+		var p struct {
+			Name string `json:"name"`
+		}
+		if err := decode(b, &p); err != nil {
+			return nil, err
+		}
+		if err := core.ValidatePlayerName(p.Name); err != nil {
+			return nil, err
+		}
+		return map[string]string{"name": p.Name, "uuid": core.OfflineUUID(p.Name)}, nil
 	case "progress":
 		var p struct {
 			Phase string `json:"phase"`
@@ -135,6 +154,14 @@ func (i *invocation) host(method string, b json.RawMessage) (any, error) {
 		}
 		defer root.Close()
 		return nil, safefile.AtomicRoot(root, p.Path, p.Value)
+	case "storage.global.get", "storage.global.set":
+		if err := i.require("storage.global"); err != nil {
+			return nil, err
+		}
+		if method == "storage.global.get" {
+			return i.manager.Store.GlobalSetting(i.plugin.manifest.ID), nil
+		}
+		return nil, i.manager.Store.SetGlobalSetting(i.plugin.manifest.ID, b)
 	case "storage.get", "storage.set":
 		if err := i.require("storage.version"); err != nil {
 			return nil, err

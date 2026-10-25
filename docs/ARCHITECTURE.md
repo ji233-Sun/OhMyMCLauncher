@@ -31,11 +31,17 @@ MyGO 桌面窗口（标准系统边框，纯 WebUI）
 - `app.NewWithMinecraftRoot` / `core.NewStoreWithMinecraftRoot` 显式分离两个根目录；`New` / `NewStore` 保留旧的配置目录内 `minecraft` 默认值，供兼容调用方与测试使用，CLI 不使用该默认值。
 - `Version.Directory` 指向该版本所属的共享资源根目录，`Version.GameDirectory` 指向其运行数据目录，不能拿新的默认根目录替换旧登记中的这两个路径。更改默认根目录不迁移文件。
 - 导入接受启动器父目录、Minecraft 根目录、`versions` 或单版本目录；读取标准 JSON，按版本本地游戏数据标记识别 PCL/HMCL 风格隔离，不导入第三方账号或私有设置。原版下载插件继续分配 `instances/<实例 ID>` 作为独立游戏数据目录。
+- `app.NewWithMinecraftRoot` 在启动时调用 `Store.Discover(false)`，自动登记当前游戏根目录下具有标准元数据及客户端 JAR 的版本。单项损坏记录为 `scanIssues`；不改写源文件、既有名称、备注、路径或配置。UI 无手动路径导入入口，`Store.Import` / `versions.import` 保留给兼容调用与只读测试。
+- 移除登记同时保存该路径的忽略标记，重启不会立即恢复；用户主动“重新识别”时调用 `Discover(true)` 恢复当前根目录内已移除的登记。扫描期间禁止安装任务，避免登记正在下载的版本；不删除磁盘文件。
 - 插件文件能力以 `Store.MinecraftRoot()` 为边界；配置、第三方插件、进程日志及原生库缓存使用 `Store.Root()`。导入外部安装不会自动扩大插件文件权限。
 
 ## 插件职责
 
-`plugins/vanilla` 决定官方版本目录、下载计划、平台依赖、资源映射、安装后登记；`plugins/launch-settings` 决定启动参数表单、保存逻辑和钩子行为。它们不是 Go 内核里的两个开关。
+`plugins/vanilla` 决定官方版本目录、下载计划、平台依赖、资源映射、安装后登记；`plugins/launch-settings` 决定启动参数表单、保存逻辑和钩子行为；`plugins/player-profiles` 管理全局离线档案并提供玩家名称。
+
+启动参数插件保存推荐模式开关；旧配置未记录开关但已有最大内存值时，按自定义配置保留。推荐模式在加载和启动时读取系统物理内存，最大堆取总量一半、可用量四分之三、8 GiB 三者最小值，按 256 MiB 向下取整，最低 128 MiB；最小堆取最大堆四分之一并按 128 MiB 向下取整，限制在 128–1024 MiB。这是保守预算，不承诺适合所有整合包；UI 区分系统已用、游戏最小值、可增长区间与剩余空间。探测失败可切到自定义配置，已保存的推荐模式在探测失败时阻止启动并说明原因。
+
+玩家档案由插件独立存储在 `state.json` 的 `global[插件 ID]`，不依赖版本。先运行 `launch.configure`，再运行 `identity.configure`，最后校验，因此旧版本设置中的 `playerName` 不会覆盖全局选择；旧名称不擅自迁移为某个全局玩家。禁用档案插件后回到核心的 `Player`，启用后恢复选择。离线 UUID 按名称计算，改名可能改变存档中的玩家归属，UI 提供明确提示，不改写存档。
 
 插件目录包含清单和单文件 ESM。`internal/plugins` 读取不可变源码快照，验证声明，运行时只暴露显式宿主能力。每次调用新建 runtime，避免跨调用/跨插件 JS 状态泄漏；持久状态归属于宿主。
 
@@ -48,11 +54,12 @@ MyGO 桌面窗口（标准系统边框，纯 WebUI）
 - `internal/desktop/window.go`：直接加载 WebUI 的 MyGO 窗口与服务桥接；不创建 NativeUI 视图、原生工具栏、状态栏或系统玻璃背景。系统目录选择器和打开目录仍通过受限桥接调用。
 - `web/`：无框架静态 HTML/CSS/ESM；左侧导航、版本卡片、每版本工作区、通用插件表单/目录、任务和日志。
 - `assets.go` / `plugins/builtin.go`：嵌入静态资源与内置插件，发布 EXE 不依赖源码目录。
+- 构建脚本通过 `scripts/embed-icon.ps1` 将 `web/assets/app.ico` 的多尺寸图标嵌入 EXE 的资源组 1，MyGO 同时将其用作窗口和任务栏图标。图标源图为现有方块标识衍生的 `app-icon.svg`，网页 favicon 使用同一源图；运行与正常构建不依赖图像转换工具。
 - 插件 UI 只能贡献声明式数据，不执行插件提供的 HTML。轮询只更新必要状态，不应覆盖正在编辑的表单。
 
 ## 本地接口
 
-`state.get` 返回版本、插件、任务、进程和平台，并分别提供 `dataRoot`（配置）与 `minecraftRoot`（托管游戏）；版本操作为 `versions.import/update/remove/launch/preview/stop`，另有 `logs.get`、`java.detect`、`plugins.toggle/reload/invoke`、`jobs.cancel`。
+`state.get` 返回版本、插件、任务、进程、平台、系统物理内存、当前玩家名称与扫描问题，并分别提供 `dataRoot`（配置）与 `minecraftRoot`（托管游戏）；版本操作为 `versions.scan/import/update/remove/launch/preview/stop`，另有 `logs.get`、`java.detect`、`plugins.toggle/reload/invoke`、`jobs.cancel`。运行日志位于 `#version/<实例 ID>/logs`，不再提供全局日志入口；旧的 `#logs/<实例 ID>` 路由仍能打开对应版本日志。
 
 桌面绑定额外处理 `desktop.pickFolder` / `desktop.openFolder`。Web 模式明确拒绝这两项，不伪装成原生操作。
 

@@ -1,0 +1,16 @@
+{
+  "apiVersion": 1,
+  "id": "ohmymc.player-profiles",
+  "name": "玩家档案管理",
+  "version": "1.0.0",
+  "author": "OhMyMC",
+  "description": "新建、切换和移除本地离线玩家档案，所有版本统一使用当前档案。尚不支持 Microsoft 正版登录。",
+  "entry": "main.js",
+  "permissions": ["storage.global", "identity.configure"],
+  "actions": {"load": {}, "create": {}, "select": {}, "remove": {}},
+  "hooks": ["identity.configure"],
+  "panels": [{
+    "id": "players", "title": "玩家档案管理", "description": "所有版本使用当前选中的玩家名称。离线档案无法通过正版服务器身份验证。",
+    "scope": "global", "kind": "profiles", "loadAction": "load", "submitAction": "create", "submitLabel": "新建玩家档案", "selectAction": "select", "removeAction": "remove"
+  }]
+}

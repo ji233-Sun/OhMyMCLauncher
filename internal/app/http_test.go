@@ -46,7 +46,7 @@ func TestBrowserBridgeAuthorization(t *testing.T) {
 	if err := json.Unmarshal(out.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if len(response.Result.Plugins) != 2 || len(response.Result.Versions) != 0 {
+	if len(response.Result.Plugins) != 3 || len(response.Result.Versions) != 0 || response.Result.PlayerName != "Player" {
 		t.Fatal(out.Body.String())
 	}
 }

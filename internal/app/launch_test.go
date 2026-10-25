@@ -97,10 +97,15 @@ func TestJavaLaunchThroughService(t *testing.T) {
 		t.Fatal(err)
 	}
 	v := imported.([]core.Version)[0]
+	if _, err = s.Invoke(ctx, "plugins.invoke", map[string]any{
+		"id": "ohmymc.player-profiles", "action": "create", "data": map[string]any{"name": "FixturePlayer"},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	_, err = s.Invoke(ctx, "plugins.invoke", map[string]any{
 		"id": "ohmymc.launch-settings", "action": "save", "versionId": v.ID,
 		"data": map[string]any{"values": map[string]any{
-			"playerName": "FixturePlayer", "javaPath": java.Path,
+			"playerName": "IgnoredOldName", "javaPath": java.Path, "useRecommendedMemory": false,
 			"minMemoryMB": 128, "maxMemoryMB": 256,
 			"jvmArgs": "-Dohmymc.fixture=with spaces", "gameArgs": "one argument with spaces",
 		}},
@@ -114,6 +119,9 @@ func TestJavaLaunchThroughService(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(preview.(core.LaunchPlan).Args, "\n"), "-Xmx256M") {
 		t.Fatal("launch.configure was not applied")
+	}
+	if !strings.Contains(strings.Join(preview.(core.LaunchPlan).Args, "\n"), "FixturePlayer") {
+		t.Fatal("preview did not use the selected global player profile")
 	}
 	if _, err = s.Invoke(ctx, "versions.launch", map[string]any{"id": v.ID}); err != nil {
 		t.Fatal(err)

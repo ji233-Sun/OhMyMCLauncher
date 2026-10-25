@@ -43,19 +43,23 @@ func TestBuiltinSettingsIsolationAndDisable(t *testing.T) {
 	v, _ := m.Store.Add(core.Version{Name: "A", VersionID: "a", Directory: t.TempDir(), GameDirectory: t.TempDir()})
 	other, _ := m.Store.Add(core.Version{Name: "B", VersionID: "b", Directory: t.TempDir(), GameDirectory: t.TempDir()})
 	id := "ohmymc.launch-settings"
+	if _, err := m.Invoke(context.Background(), id, "save", other.ID, map[string]any{"values": map[string]any{"useRecommendedMemory": false, "maxMemoryMB": 2048}}); err != nil {
+		t.Fatal(err)
+	}
 	load, err := m.Invoke(context.Background(), id, "load", v.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if load.(map[string]any)["values"].(map[string]any)["playerName"] != "Player" {
+	values := load.(map[string]any)["values"].(map[string]any)
+	if _, exists := values["playerName"]; exists {
 		t.Fatal(load)
 	}
-	_, err = m.Invoke(context.Background(), id, "save", v.ID, map[string]any{"values": map[string]any{"maxMemoryMB": 4096, "playerName": "Alex"}})
+	_, err = m.Invoke(context.Background(), id, "save", v.ID, map[string]any{"values": map[string]any{"useRecommendedMemory": false, "maxMemoryMB": 4096, "playerName": "Alex"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	opts, err := m.Configure(context.Background(), v)
-	if err != nil || opts.MaxMemoryMB != 4096 || opts.PlayerName != "Alex" {
+	if err != nil || opts.MaxMemoryMB != 4096 || opts.PlayerName != "Player" {
 		t.Fatal(opts, err)
 	}
 	opts, err = m.Configure(context.Background(), other)
@@ -77,7 +81,7 @@ func TestBuiltinSettingsIsolationAndDisable(t *testing.T) {
 	if err != nil || opts.MaxMemoryMB != 4096 {
 		t.Fatal("settings lost")
 	}
-	if _, err = m.Invoke(context.Background(), id, "save", v.ID, map[string]any{"values": map[string]any{"maxMemoryMB": 1}}); err == nil {
+	if _, err = m.Invoke(context.Background(), id, "save", v.ID, map[string]any{"values": map[string]any{"useRecommendedMemory": false, "maxMemoryMB": 1}}); err == nil {
 		t.Fatal("invalid settings accepted")
 	}
 }

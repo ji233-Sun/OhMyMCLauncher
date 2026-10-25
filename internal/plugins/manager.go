@@ -41,6 +41,8 @@ type Panel struct {
 	LoadAction   string  `json:"loadAction"`
 	SubmitAction string  `json:"submitAction"`
 	SubmitLabel  string  `json:"submitLabel"`
+	SelectAction string  `json:"selectAction,omitempty"`
+	RemoveAction string  `json:"removeAction,omitempty"`
 	Fields       []Field `json:"fields"`
 }
 type Action struct {
@@ -87,7 +89,7 @@ func New(store *core.Store, j *jobs.Manager) (*Manager, error) {
 }
 
 var pluginID = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{2,63}$`)
-var capabilities = map[string]bool{"network.minecraft": true, "files.minecraft": true, "versions.add": true, "storage.version": true, "launch.configure": true}
+var capabilities = map[string]bool{"network.minecraft": true, "files.minecraft": true, "versions.add": true, "storage.version": true, "storage.global": true, "system.memory": true, "launch.configure": true, "identity.configure": true}
 
 func validate(m Manifest) error {
 	if m.APIVersion != 1 || !pluginID.MatchString(m.ID) || strings.TrimSpace(m.Name) == "" || m.Version == "" {
@@ -110,7 +112,7 @@ func validate(m Manifest) error {
 		return false
 	}
 	for _, hook := range m.Hooks {
-		if hook != "launch.configure" || !has(hook) {
+		if (hook != "launch.configure" && hook != "identity.configure") || !has(hook) {
 			return errors.New("不支持或未授权的启动钩子")
 		}
 	}
@@ -126,12 +128,22 @@ func validate(m Manifest) error {
 		if p.Scope != "version" && p.Scope != "global" {
 			return errors.New("未知面板作用域")
 		}
-		if p.Kind != "catalog" && p.Kind != "form" {
+		if p.Kind != "catalog" && p.Kind != "form" && p.Kind != "launch" && p.Kind != "profiles" {
 			return errors.New("未知面板类型")
 		}
 		for _, action := range []string{p.LoadAction, p.SubmitAction} {
 			if _, ok := m.Actions[action]; !ok {
 				return errors.New("面板引用了未声明动作")
+			}
+		}
+		if p.Kind == "profiles" {
+			if p.Scope != "global" {
+				return errors.New("玩家档案面板必须是全局面板")
+			}
+			for _, action := range []string{p.SelectAction, p.RemoveAction} {
+				if _, ok := m.Actions[action]; !ok {
+					return errors.New("玩家档案面板引用了未声明动作")
+				}
 			}
 		}
 		if len(p.Fields) > 100 {
@@ -341,5 +353,49 @@ func (m *Manager) Configure(ctx context.Context, v core.Version) (core.LaunchOpt
 			}
 		}
 	}
+	name, err := m.PlayerName(ctx)
+	if err != nil {
+		return options, err
+	}
+	options.PlayerName = name
 	return options, options.Validate()
+}
+
+// Identity providers run after launch configuration so all versions use the
+// selected global profile, regardless of old per-version playerName settings.
+func (m *Manager) PlayerName(ctx context.Context) (string, error) {
+	name := core.DefaultOptions().PlayerName
+	for _, info := range m.List() {
+		if !info.Enabled {
+			continue
+		}
+		for _, hook := range info.Hooks {
+			if hook != "identity.configure" {
+				continue
+			}
+			p, err := m.get(info.ID)
+			if err != nil {
+				return "", err
+			}
+			out, err := m.execute(ctx, p, hook, "", map[string]any{}, nil, false)
+			if err != nil {
+				return "", fmt.Errorf("插件 %s 无法提供玩家身份: %w", info.Name, err)
+			}
+			b, err := json.Marshal(out)
+			if err != nil {
+				return "", err
+			}
+			var identity struct {
+				PlayerName string `json:"playerName"`
+			}
+			if err = json.Unmarshal(b, &identity); err != nil {
+				return "", err
+			}
+			if err = core.ValidatePlayerName(identity.PlayerName); err != nil {
+				return "", err
+			}
+			name = identity.PlayerName
+		}
+	}
+	return name, nil
 }

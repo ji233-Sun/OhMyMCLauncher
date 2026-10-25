@@ -192,16 +192,16 @@ const findVersion = id => state.versions.find(version => version.id === id);
 const runningProcess = id => state.processes.find(process => process.versionId === id && process.running);
 const versionHash = id => `#version/${encodeURIComponent(id)}`;
 const panelHash = (pluginId, panelId, versionId) => versionId ? `${versionHash(versionId)}/panel/${encodeURIComponent(pluginId)}/${encodeURIComponent(panelId)}` : `#panel/${encodeURIComponent(pluginId)}/${encodeURIComponent(panelId)}`;
-const logsHash = id => id ? `#logs/${encodeURIComponent(id)}` : '#logs';
+const logsHash = id => `${versionHash(id)}/logs`;
 function globalPanels() { return state.plugins.filter(plugin => plugin.enabled && !plugin.error).flatMap(plugin => list(plugin.panels).filter(panel => panel.scope === 'global').map(panel => ({ plugin, panel }))); }
 function versionPanels() { return state.plugins.filter(plugin => plugin.enabled && !plugin.error).flatMap(plugin => list(plugin.panels).filter(panel => panel.scope === 'version').map(panel => ({ plugin, panel }))); }
 function downloadDestination() { const target = globalPanels().find(item => item.panel.kind === 'catalog'); return target ? panelHash(target.plugin.id, target.panel.id) : '#plugins'; }
 function parseRoute() {
   try {
     const parts = location.hash.slice(1).split('/').map(decodeURIComponent);
-    if (parts[0] === 'version' && parts[1]) return { page: 'version', id: parts[1], pluginId: parts[2] === 'panel' ? parts[3] : '', panelId: parts[2] === 'panel' ? parts[4] : '' };
+    if (parts[0] === 'version' && parts[1]) return { page: 'version', id: parts[1], logs: parts[2] === 'logs', pluginId: parts[2] === 'panel' ? parts[3] : '', panelId: parts[2] === 'panel' ? parts[4] : '' };
     if (parts[0] === 'panel' && parts[1] && parts[2]) return { page: 'panel', pluginId: parts[1], panelId: parts[2] };
-    if (parts[0] === 'logs') return { page: 'logs', id: parts[1] || '' };
+    if (parts[0] === 'logs' && parts[1]) return { page: 'version', id: parts[1], logs: true };
     return { page: ['tasks', 'plugins'].includes(parts[0]) ? parts[0] : 'library' };
   } catch { return { page: 'library' }; }
 }
@@ -245,7 +245,9 @@ function updateConnection() {
 function updateSidebar() {
   text($('#version-count'), ready ? state.versions.length : '—');
   const tasks = state.jobs.filter(activeJob).length; text($('#task-count'), tasks); $('#task-count').hidden = !tasks;
-  $('#running-dot').hidden = !state.processes.some(process => process.running);
+  text($('#identity-name'), state.playerName || '玩家档案不可用');
+  text($('#identity-caption'), state.profileError ? '档案读取失败' : '离线玩家 · 切换档案');
+  $('#identity-button').title = state.profileError || `当前玩家：${state.playerName || 'Player'} · 管理玩家档案`;
   text($('#app-version'), state.appVersion ? `v${str(state.appVersion).replace(/^v/, '')}` : 'OhMyMC');
   text($('#platform-label'), state.platform ? str(state.platform).toUpperCase() : 'LOCAL FIRST');
   text($('#workspace-location'), state.minecraftRoot || state.dataRoot || 'OhMyMC / MINECRAFT WORKSPACE');
@@ -253,7 +255,7 @@ function updateSidebar() {
   const signature = JSON.stringify([ready, panels.map(({ plugin, panel }) => [plugin.id, plugin.name, panel.id, panel.title, panel.kind])]);
   if (signature !== navigationSignature) {
     navigationSignature = signature;
-    preserveFocusReplace($('#panel-nav'), ...panels.map(({ plugin, panel }) => h('a', { href: panelHash(plugin.id, panel.id), class: 'nav-link', 'data-panel-key': `${plugin.id}/${panel.id}`, 'data-focus-key': `nav-${plugin.id}/${panel.id}`, title: `${panel.title} · ${plugin.name}` }, h('span', { class: 'nav-icon' }, icon(panel.kind === 'catalog' ? 'download' : 'sliders')), h('span', { class: 'nav-label' }, panel.title))));
+    preserveFocusReplace($('#panel-nav'), ...panels.map(({ plugin, panel }) => h('a', { href: panelHash(plugin.id, panel.id), class: 'nav-link', 'data-panel-key': `${plugin.id}/${panel.id}`, 'data-focus-key': `nav-${plugin.id}/${panel.id}`, title: `${panel.title} · ${plugin.name}` }, h('span', { class: 'nav-icon' }, icon(panel.kind === 'catalog' ? 'download' : panel.kind === 'profiles' ? 'user' : 'sliders')), h('span', { class: 'nav-label' }, panel.title))));
     $('#panel-nav-hint').hidden = Boolean(panels.length);
     text($('#panel-nav-hint'), ready ? '在插件管理中启用扩展面板' : '连接后载入插件面板');
   }
@@ -287,7 +289,6 @@ function renderRoute(focus = false) {
   else if (route.page === 'panel') activeView = renderGlobalPanel(root);
   else if (route.page === 'plugins') activeView = renderPlugins(root);
   else if (route.page === 'tasks') activeView = renderTasks(root);
-  else activeView = renderLogs(root, route.id);
   updateSidebar();
   if (focus && !dialog.open) $('#page-title').focus({ preventScroll: true });
 }
@@ -295,25 +296,29 @@ function renderRoute(focus = false) {
 function libraryEmpty() {
   const destination = downloadDestination();
   const copy = h('div', { class: 'empty-copy' }, h('div', { class: 'eyebrow' }, '一个新的起点'), h('h2', {}, '你的下一个世界，', h('br'), '从这里开始。'));
-  copy.append(h('p', {}, ready ? '版本库还是空的。导入已有的 Minecraft，' : connectionError ? '连接后，你的版本会在这里呈现。' : '正在连接本地启动器，读取版本与插件。', h('br'), ready ? '或者让下载插件为你准备第一次冒险。' : '没有演示数据，只有属于你的游戏文件。'));
+  copy.append(h('p', {}, ready ? '启动器会自动识别所在目录中的 .minecraft。' : connectionError ? '连接后，你的版本会在这里呈现。' : '正在连接本地启动器，读取版本与插件。', h('br'), ready ? '也可以让下载插件为你准备第一次冒险。' : '没有演示数据，只有属于你的游戏文件。'));
   if (!ready && !connectionError) copy.append(loading('正在读取工作空间…'));
-  else copy.append(h('div', { class: 'empty-actions' }, button('导入本地版本', 'plus', 'btn-primary', openImport), ready ? link(destination === '#plugins' ? '管理下载插件' : '下载新版本', destination, 'btn', 'download') : button('重新连接', 'refresh', '', control => perform(control, '连接中', () => refreshState(true)))));
-  copy.append(h('div', { class: 'empty-footnote' }, icon('shield'), '导入只建立索引，不移动原始文件'));
+  else copy.append(h('div', { class: 'empty-actions' }, ready ? link(destination === '#plugins' ? '管理下载插件' : '下载新版本', destination, 'btn btn-primary', 'download') : button('重新连接', 'refresh', '', control => perform(control, '连接中', () => refreshState(true))), ready ? button('重新识别', 'refresh', '', scanVersions) : null));
+  copy.append(h('div', { class: 'empty-footnote' }, icon('shield'), '自动登记原路径，保留你的游戏文件'));
   const scene = h('section', { class: 'empty-library surface' }, h('div', { class: 'empty-art' }, h('img', { src: './assets/world.svg', width: '360', height: '300', alt: '' }), h('span', { class: 'art-caption' }, 'A LITTLE SPACE. ENDLESS WORLDS.')), copy);
   const guides = h('div', { class: 'getting-started' },
-    h('article', { class: 'guide-card' }, h('span', { class: 'guide-icon' }, icon('folder')), h('div', {}, h('h3', {}, '已经有游戏文件？'), h('p', {}, '选择 .minecraft 根目录或单个版本文件夹。', h('br'), '熟悉的存档与设置，留在熟悉的位置。'), button('选择导入路径', 'arrow-right', 'btn-quiet btn-sm', openImport))),
+    h('article', { class: 'guide-card' }, h('span', { class: 'guide-icon' }, icon('folder')), h('div', {}, h('h3', {}, '放在游戏旁，打开就能识别'), h('p', {}, '将启动器放在 .minecraft 所在的文件夹。', h('br'), '启动时自动读取版本，存档与设置留在原处。'), h('p', { class: 'mono' }, state.minecraftRoot || '启动器目录 / .minecraft'))),
     h('article', { class: 'guide-card' }, h('span', { class: 'guide-icon' }, icon('puzzle')), h('div', {}, h('h3', {}, '按自己的方式启动'), h('p', {}, '下载与启动参数由插件提供。', h('br'), '在插件管理中查看来源、能力与权限。'), link('了解已安装插件', '#plugins', 'link-button', 'arrow-right'))));
   return h('div', {}, scene, guides);
 }
 function renderLibrary(root) {
-  setHeader('版本库', 'YOUR COLLECTION', '把每一次出发，收纳在这里。', [button('导入版本', 'plus', 'btn-primary', openImport)]);
+  setHeader('版本库', 'YOUR COLLECTION', '自动识别启动器旁的游戏，把每一次出发收纳在这里。', [button('重新识别', 'refresh', '', scanVersions), link('下载新版本', downloadDestination(), 'btn btn-primary', 'download')]);
   const count = h('span', { class: 'count-chip' });
   let query = '', sort = 'created', signature = '';
   const search = searchControl('搜索版本名称、Minecraft 版本或备注', '搜索版本名称或版本号', () => { query = search.input.value.trim().toLocaleLowerCase(); update(); });
   const sorting = h('select', { class: 'select', 'aria-label': '版本排序', onchange: event => { sort = event.target.value; update(); } }, h('option', { value: 'created' }, '最近添加'), h('option', { value: 'name' }, '名称排序'), h('option', { value: 'played' }, '最近启动'));
   root.append(h('div', { class: 'library-toolbar' }, h('div', { class: 'section-caption' }, '全部版本', count), h('div', { class: 'toolbar-inputs' }, search.node, sorting)));
-  const content = h('div'); root.append(content);
+  const scanNotice = h('div', { class: 'alert scan-notice', hidden: true });
+  const content = h('div'); root.append(scanNotice, content);
   function update() {
+    const issues = list(state.scanIssues);
+    scanNotice.hidden = !issues.length;
+    if (issues.length) scanNotice.replaceChildren(icon('warning'), h('div', {}, h('strong', {}, `${issues.length} 个目录未能识别`), ...issues.map(issue => h('p', {}, `${issue.versionId ? `${issue.versionId}：` : ''}${issue.message}`))));
     text(count, ready ? state.versions.length : '—');
     search.input.disabled = !state.versions.length; sorting.disabled = !state.versions.length;
     const next = JSON.stringify([ready, Boolean(connectionError), state.versions, state.processes, [...pendingVersions], query, sort, downloadDestination()]);
@@ -359,36 +364,18 @@ function openDialog(title, description, { wide = false } = {}) {
   return { body, footer, close, alive: () => serial === dialogSerial && dialog.open, focus: control => queueMicrotask(() => { if (serial === dialogSerial && dialog.open) control.focus(); }) };
 }
 function openIdentity() {
+  const destination = globalPanels().find(({ panel }) => panel.kind === 'profiles');
+  if (destination) { navigate(panelHash(destination.plugin.id, destination.panel.id)); return; }
   const modal = openDialog('本地离线身份', '当前账号能力，保持透明。');
   modal.body.append(h('div', { class: 'alert alert-info' }, icon('user'), h('div', {}, h('strong', {}, '当前仅支持本地离线身份'), h('p', {}, '这不是 Microsoft 或 Minecraft 正版在线登录。离线身份不提供正版服务器的身份验证。'))), h('div', { class: 'import-guide' }, h('strong', {}, '账号功能由插件扩展'), '正版在线登录需等待相应账号插件提供；当前界面没有在线登录或账号绑定功能。可用的启动身份配置以已启用插件面板为准。'));
   const close = button('知道了', 'check', 'btn-primary', modal.close); modal.footer.append(close); modal.focus(close);
 }
-function openImport() {
-  const modal = openDialog('导入已有版本', '把本地 Minecraft 加入版本库，不复制或移动游戏文件。');
-  const input = h('input', { type: 'text', id: 'import-path', placeholder: '例如 D:\\MC 或 D:\\MC\\.minecraft', required: true, autocomplete: 'off', spellcheck: 'false' });
-  const error = inlineError();
-  const form = h('form', { id: 'import-form' });
-  const submit = button('导入版本', 'plus', 'btn-primary', null, { type: 'submit', form: 'import-form', disabled: true });
-  const pick = button('选择文件夹', 'folder', '', control => perform(control, '选择中', async () => {
-    try {
-      const path = await invoke('desktop.pickFolder');
-      if (path && modal.alive()) { input.value = str(path); submit.disabled = !input.value.trim(); input.focus(); }
-    } catch (failure) { throw new Error(`${errorMessage(failure)} 请手动输入文件夹的完整路径。`); }
-  }, { errorTarget: error }));
-  form.append(h('div', { class: 'field' }, h('label', { for: input.id }, '本地游戏路径', h('span', { class: 'required-mark', 'aria-hidden': 'true' }, '*')), h('div', { class: 'input-action' }, input, pick), h('p', { class: 'field-hint', id: 'import-path-hint' }, '支持含 .minecraft 的启动器目录、.minecraft、versions 或单个版本文件夹。浏览器中也可以直接输入路径。')), h('div', { class: 'import-guide' }, h('strong', {}, '文件留在原处，版本集中管理'), '请选择包含版本 JSON 与游戏文件的现有目录。导入后可独立修改显示名称和说明；移除版本记录也不会删除磁盘文件。'), error);
-  input.setAttribute('aria-describedby', 'import-path-hint');
-  input.addEventListener('input', () => { if (!submit.dataset.busy) submit.disabled = !input.value.trim(); });
-  form.addEventListener('submit', event => {
-    event.preventDefault(); if (!input.value.trim() || !form.reportValidity()) return;
-    perform(submit, '正在导入', async () => {
-      const result = await invoke('versions.import', { path: input.value.trim() });
-      const versions = list(result);
-      if (!versions.length) throw new Error('此路径下没有发现可导入的版本。请检查目录及版本 JSON 文件。');
-      for (const version of versions) mergeVersion(version);
-      modal.close(); toast('版本已导入', `本次读取到 ${versions.length} 个版本。`); await refreshState(true);
-    }, { errorTarget: error });
+async function scanVersions(control) {
+  await perform(control, '正在识别', async () => {
+    const result = await invoke('versions.scan');
+    await refreshState(true);
+    toast('版本识别完成', `新增 ${list(result?.added).length} 个登记${list(result?.issues).length ? `，${list(result.issues).length} 个目录需要检查` : ''}。`);
   });
-  modal.body.append(form); modal.footer.append(button('取消', null, '', modal.close), submit); modal.focus(input);
 }
 async function launchVersion(version, control) {
   if (pendingVersions.has(version.id) || runningProcess(version.id)) return;
@@ -414,7 +401,7 @@ function confirmStop(version) {
   confirmation({ title: '停止正在运行的游戏？', description: str(version.name), explanation: '这会结束该版本的游戏进程。未保存的游戏进度可能丢失；建议先在游戏内保存并退出。', label: '确认停止', action: async () => { await invoke('versions.stop', { id: version.id }); }, success: '已发送停止请求' });
 }
 function confirmRemove(version) {
-  confirmation({ title: '从版本库移除？', description: str(version.name), explanation: '仅移除 OhMyMC 中的版本记录，不会删除磁盘上的游戏文件、存档或设置。之后可以通过原路径重新导入。', label: '移除记录', action: async () => { await invoke('versions.remove', { id: version.id }); commit(data => { data.versions = data.versions.filter(item => item.id !== version.id); }); navigate('#library'); }, success: '已移除版本记录，磁盘文件保持不变' });
+  confirmation({ title: '从版本库移除？', description: str(version.name), explanation: '仅移除版本记录，保留游戏文件、存档和游戏设置。下次启动时不会自动加回；点击版本库的「重新识别」可以恢复当前目录下的登记。', label: '移除记录', action: async () => { await invoke('versions.remove', { id: version.id }); commit(data => { data.versions = data.versions.filter(item => item.id !== version.id); }); navigate('#library'); }, success: '已移除版本记录，磁盘文件保持不变' });
 }
 function openPreview(version) {
   const modal = openDialog('启动命令预览', '只展示启动器生成的参数，不会启动游戏。', { wide: true });
@@ -458,14 +445,13 @@ function renderVersion(root, id) {
     root.append(emptyState('cube', '找不到这个版本', '磁盘文件不会因记录移除而被删除，你可以返回版本库重新导入。', link('返回版本库', '#library', 'btn btn-primary', 'arrow-left')));
     return {};
   }
-  const logs = link('运行日志', logsHash(id), 'btn', 'terminal');
   const launch = button('启动游戏', 'play', 'btn-primary', control => launchVersion(findVersion(id), control));
   const stop = button('停止游戏', 'stop', 'btn-danger', () => confirmStop(findVersion(id)));
-  setHeader(version.name || version.id, 'VERSION WORKSPACE', `Minecraft ${version.minecraftVersion || version.versionId || '未知版本'} · ${typeLabel(version.type)}`, [logs, launch, stop], version.minecraftVersion || '');
-  root.append(h('div', { class: 'breadcrumb' }, link('版本库', '#library', '', 'arrow-left'), icon('chevron-right'), h('span', {}, '版本详情')));
+  setHeader(version.name || version.id, 'VERSION WORKSPACE', `Minecraft ${version.minecraftVersion || version.versionId || '未知版本'} · ${typeLabel(version.type)}`, [launch, stop], version.minecraftVersion || '');
+  root.append(h('nav', { class: 'version-navigation', 'aria-label': '版本导航' }, link('返回版本库', '#library', 'btn btn-quiet btn-sm back-link', 'arrow-left'), h('span', { class: 'navigation-divider', 'aria-hidden': 'true' }), h('span', { class: 'navigation-current' }, version.name || version.id)));
   const tabs = h('nav', { class: 'tabs', 'aria-label': '版本详情选项卡' }); root.append(tabs);
   const body = h('div'); root.append(body); let tabSignature = '';
-  const child = route.panelId ? renderPluginPanel(body, route.pluginId, route.panelId, id) : renderOverview(body, id);
+  const child = route.logs ? renderLogs(body, id) : route.panelId ? renderPluginPanel(body, route.pluginId, route.panelId, id) : renderOverview(body, id);
   function update() {
     const current = findVersion(id);
     if (!current) { renderRoute(false); return; }
@@ -477,16 +463,18 @@ function renderVersion(root, id) {
     const signature = JSON.stringify(panels.map(({ plugin, panel }) => [plugin.id, plugin.name, panel.id, panel.title]));
     if (signature !== tabSignature || !tabs.childElementCount) {
       tabSignature = signature;
-      const overview = link('基础概览', versionHash(id), `tab ${!route.panelId ? 'is-selected' : ''}`, 'grid');
-      if (!route.panelId) overview.setAttribute('aria-current', 'page');
+      const overview = link('基础概览', versionHash(id), `tab ${!route.panelId && !route.logs ? 'is-selected' : ''}`, 'grid');
+      if (!route.panelId && !route.logs) overview.setAttribute('aria-current', 'page');
+      const logs = link('运行日志', logsHash(id), `tab ${route.logs ? 'is-selected' : ''}`, 'terminal');
+      if (route.logs) logs.setAttribute('aria-current', 'page');
       preserveFocusReplace(tabs, overview, ...panels.map(({ plugin, panel }) => {
         const selected = route.pluginId === plugin.id && route.panelId === panel.id;
         return h('a', { href: panelHash(plugin.id, panel.id, id), class: `tab ${selected ? 'is-selected' : ''}`, 'aria-current': selected ? 'page' : null, 'data-focus-key': `tab-${plugin.id}/${panel.id}` }, icon('puzzle'), panel.title, h('span', { class: 'tab-source' }, plugin.name));
-      }));
+      }), logs);
     }
     child?.update?.();
   }
-  update(); return { update, dispose: () => child?.dispose?.() };
+  update(); return { update, poll: () => child?.poll?.(), dispose: () => child?.dispose?.() };
 }
 function cardHeading(title, description, glyph) { return h('div', { class: 'card-header' }, h('div', {}, h('h2', {}, title), description ? h('p', {}, description) : null), glyph ? h('span', { class: 'card-title-icon' }, icon(glyph)) : null); }
 function renderOverview(root, id) {
@@ -529,10 +517,12 @@ function renderOverview(root, id) {
   const launch = button('启动游戏', 'play', 'btn-primary', control => launchVersion(findVersion(id), control));
   const stop = button('停止游戏', 'stop', 'btn-danger', () => confirmStop(findVersion(id)));
   const launchCard = h('section', { class: 'surface card launch-box' }, cardHeading('准备出发', '使用此版本的实际启动配置。'), h('div', { class: 'launch-readiness' }, icon('java'), h('div', {}, launchTitle, launchHint)), launch, stop, h('div', { class: 'launch-tools' }, button('预览命令', 'code', 'btn-quiet btn-sm', () => openPreview(findVersion(id))), button('检测 Java', 'java', 'btn-quiet btn-sm', openJava), link('查看日志', logsHash(id), 'link-button', 'terminal')));
-  const account = h('section', { class: 'surface card' }, cardHeading('本地离线启动', '身份能力说明', 'user'), h('p', { class: 'field-hint' }, '当前仅使用本地离线身份，不提供正版在线身份验证。正版登录需由后续账号插件提供。'), button('查看说明', 'arrow-right', 'btn-quiet btn-sm', openIdentity));
+  const player = h('strong', { class: 'current-player' });
+  const account = h('section', { class: 'surface card' }, cardHeading('当前玩家档案', '所有版本使用同一个选中档案。', 'user'), player, h('p', { class: 'field-hint' }, '本地离线身份，无法通过正版服务器验证。切换名称会改变离线 UUID，可能影响存档中的玩家归属。'), button('管理玩家档案', 'arrow-right', 'btn-quiet btn-sm', openIdentity));
   root.append(h('div', { class: 'detail-layout' }, h('div', { class: 'stack' }, form, metadata), h('div', { class: 'stack' }, launchCard, account)), h('div', { class: 'danger-zone' }, h('div', {}, h('h3', {}, '不再需要这个版本？'), h('p', {}, '只移除版本库记录，不删除游戏文件与存档。')), button('移除记录', 'trash', 'btn-quiet', () => confirmRemove(findVersion(id)))));
   function update() {
     const current = findVersion(id); if (!current) return;
+    text(player, state.playerName || '玩家档案不可用');
     if (!dirty && !save.dataset.busy) { if (name.value !== current.name) name.value = str(current.name); if (notes.value !== str(current.notes)) notes.value = str(current.notes); }
     if (!save.dataset.busy) save.disabled = !dirty || !name.value.trim();
     for (const key of Object.keys(rows)) {
@@ -572,6 +562,8 @@ function renderPluginPanel(root, pluginId, panelId, versionId) {
   let child;
   if (panel.kind === 'catalog') child = renderCatalog(content, plugin, panel, versionId);
   else if (panel.kind === 'form') child = renderPluginForm(content, plugin, panel, versionId);
+  else if (panel.kind === 'launch') child = renderLaunchSettings(content, plugin, panel, versionId);
+  else if (panel.kind === 'profiles') child = renderProfiles(content, plugin, panel);
   else { content.append(emptyState('warning', '不支持的插件面板类型', `此插件声明了未知类型：${panel.kind}。请更新或检查插件。`, link('管理插件', '#plugins', 'btn'))); child = {}; }
   const signature = JSON.stringify([plugin.enabled, plugin.error, panel]);
   return { update() {
@@ -723,6 +715,181 @@ function renderPluginForm(root, plugin, panel, versionId) {
   return { update: updateSubmit, dispose: () => { disposed = true; } };
 }
 
+function renderLaunchSettings(root, plugin, panel, versionId) {
+  let disposed = false, loaded = false, busy = false, dirty = false, memory = null;
+  const controls = new Map();
+  const error = inlineError();
+  const status = h('span', { class: 'form-status', role: 'status' }, '正在读取配置…');
+  function input(key, type = 'number') {
+    const descriptor = list(panel.fields).find(item => item.key === key) || {};
+    const control = type === 'textarea' ? h('textarea', { rows: '4' }) : h('input', { type, autocomplete: 'off' });
+    control.name = key; control.disabled = true;
+    if (type === 'number') { control.min = descriptor.min; control.max = descriptor.max; control.step = '1'; control.required = true; }
+    control.placeholder = descriptor.placeholder || '';
+    control.addEventListener('input', changed);
+    controls.set(key, control); return control;
+  }
+  const java = input('javaPath', 'text');
+  const minimum = input('minMemoryMB'), maximum = input('maxMemoryMB');
+  const width = input('width'), height = input('height');
+  const fullscreen = input('fullscreen', 'checkbox');
+  const jvm = input('jvmArgs', 'textarea'), game = input('gameArgs', 'textarea');
+  const recommended = h('input', { type: 'checkbox', name: 'useRecommendedMemory', disabled: true, onchange: changed });
+  const recommendation = h('small');
+  const presets = h('select', { class: 'select', 'aria-label': '内存预设', disabled: true, onchange: () => {
+    if (!presets.value) return;
+    recommended.checked = false;
+    minimum.value = Number(presets.value) >= 4096 ? '1024' : '512'; maximum.value = presets.value;
+    changed();
+  } }, h('option', { value: '' }, '自定义 / 选择内存预设'), ...[1024, 2048, 4096, 6144, 8192].map(value => h('option', { value }, `${value / 1024} GiB · ${value} MiB`)));
+  const memorySummary = h('div', { class: 'memory-summary' });
+  const usedBar = h('span', { class: 'memory-used' }), minBar = h('span', { class: 'memory-game-min' }), rangeBar = h('span', { class: 'memory-game-range' });
+  const memoryBar = h('div', { class: 'memory-bar', role: 'img', 'aria-label': '内存预算' }, usedBar, minBar, rangeBar);
+  const memoryWarning = h('p', { class: 'memory-warning', role: 'status', hidden: true });
+  const memoryHint = h('p', { class: 'field-hint' }, '游戏区间表示 JVM 从最小到最大堆内存的预算，并非已经占用。Java 进程还需要额外内存。推荐值会在启动时按可用内存重新计算。');
+  const resolution = h('select', { class: 'select', 'aria-label': '窗口尺寸预设', disabled: true, onchange: () => {
+    if (!resolution.value) return;
+    [width.value, height.value] = resolution.value.split('x'); changed();
+  } }, h('option', { value: '' }, '自定义尺寸'), ...[[1280, 720, 'HD'], [1600, 900, 'HD+'], [1920, 1080, 'Full HD'], [2560, 1440, 'QHD'], [1080, 1920, '竖屏']].map(([w, ht, label]) => h('option', { value: `${w}x${ht}` }, `${w} × ${ht} · ${label}`)));
+  const dimensions = h('div', { class: 'resolution-inputs' }, field('宽度', width), h('span', { class: 'dimension-times', 'aria-hidden': 'true' }, '×'), field('高度', height), h('span', { class: 'dimension-unit' }, 'px'));
+  const save = button(panel.submitLabel || '保存启动配置', 'save', 'btn-primary', null, { type: 'submit', disabled: true });
+  const reload = button('重新读取', 'refresh', 'btn-sm', control => {
+    if (dirty) confirmation({ title: '丢弃尚未提交的修改？', description: panel.title, explanation: '重新读取将恢复已保存的启动配置。', label: '丢弃并重新读取', action: load, success: '已重新读取配置' });
+    else perform(control, '读取中', load, { errorTarget: error });
+  });
+  const form = h('form', { class: 'surface card launch-form' },
+    h('section', { class: 'settings-section' }, cardHeading('Java 环境', '留空时自动选择满足当前版本要求的本机 Java。', 'java'), field('Java 可执行文件', java, '可填写 java.exe / java 的完整路径；不会自动下载 Java。'), button('检测本机 Java', 'search', 'btn-sm', openJava)),
+    h('section', { class: 'settings-section' }, cardHeading('游戏内存', '根据物理内存与当前可用量，为系统留出空间。', 'sliders'),
+      h('label', { class: 'recommendation-choice' }, recommended, h('span', {}, h('strong', {}, '使用推荐方案'), recommendation), pill('自动计算')),
+      h('div', { class: 'memory-preset-row' }, h('span', {}, '常用方案'), presets),
+      h('div', { class: 'memory-inputs' }, field('最小内存 · MiB', minimum, '', true), field('最大内存 · MiB', maximum, '', true)),
+      h('div', { class: 'memory-visual' }, memorySummary, memoryBar, h('div', { class: 'memory-legend' }, h('span', { class: 'legend-used' }, '系统当前已用'), h('span', { class: 'legend-min' }, '游戏最小值'), h('span', { class: 'legend-range' }, '可增长至最大值'), h('span', { class: 'legend-free' }, '剩余空间')), memoryWarning, memoryHint)),
+    h('section', { class: 'settings-section' }, cardHeading('游戏窗口', '宽 × 高，选择常用尺寸或自行输入。', 'grid'), h('div', { class: 'resolution-row' }, dimensions, resolution), h('label', { class: 'checkbox-row' }, fullscreen, h('span', {}, h('strong', {}, '以全屏模式启动'), h('small', {}, '全屏时保留窗口尺寸设置，切回窗口后仍可使用。')))),
+    h('section', { class: 'settings-section' }, cardHeading('附加参数', '仅填写你信任的参数。'), field('附加 JVM 参数', jvm, '一行一个完整参数，无需 shell 引号。Java agent 可以执行本机代码。'), field('附加游戏参数', game, '一行一个参数，参数名与值分别占一行。')),
+    error, h('div', { class: 'form-footer' }, status, reload, save));
+  root.append(form);
+  function changed() { dirty = true; text(status, '有尚未保存的修改'); status.classList.remove('is-success'); update(); }
+  function values() {
+    return { ...Object.fromEntries([...controls].map(([key, control]) => [key, control.type === 'checkbox' ? control.checked : control.type === 'number' ? Number(control.value) : control.value])), useRecommendedMemory: recommended.checked };
+  }
+  function apply(values) {
+    for (const [key, control] of controls) {
+      if (control.type === 'checkbox') control.checked = values[key] === true;
+      else control.value = str(values[key]);
+    }
+    recommended.checked = values.useRecommendedMemory === true;
+  }
+  function update() {
+    const currentMemory = state.memory || memory;
+    const canEdit = loaded && !busy;
+    for (const control of controls.values()) control.disabled = !canEdit;
+    recommended.disabled = !canEdit || !currentMemory;
+    presets.disabled = !canEdit; resolution.disabled = !canEdit;
+    if (recommended.checked && currentMemory) {
+      minimum.value = currentMemory.recommendedMinMB; maximum.value = currentMemory.recommendedMaxMB;
+    }
+    minimum.disabled = maximum.disabled = !canEdit || recommended.checked;
+    const size = `${width.value}x${height.value}`;
+    resolution.value = [...resolution.options].some(option => option.value === size) ? size : '';
+    presets.value = !recommended.checked && [...presets.options].some(option => option.value === maximum.value) ? maximum.value : '';
+    text(recommendation, currentMemory ? `${currentMemory.recommendedMinMB}–${currentMemory.recommendedMaxMB} MiB · 根据当前可用内存估算` : '无法读取系统内存，请使用自定义方案');
+    if (!save.dataset.busy) save.disabled = !canEdit;
+    if (!reload.dataset.busy) reload.disabled = busy;
+    memoryBar.hidden = !currentMemory;
+    memorySummary.replaceChildren(currentMemory ? h('span', {}, '物理内存 ', h('strong', {}, `${(currentMemory.totalMB / 1024).toFixed(1)} GiB`)) : h('span', {}, '系统物理内存暂不可用'), h('span', {}, `游戏预算 ${formatNumber(minimum.value)}–${formatNumber(maximum.value)} MiB`));
+    if (currentMemory) {
+      const total = currentMemory.totalMB, used = currentMemory.usedMB, low = number(minimum.value), high = number(maximum.value);
+      const percent = value => `${Math.min(100, Math.max(0, value / total * 100))}%`;
+      usedBar.style.width = percent(used);
+      minBar.style.left = percent(used); minBar.style.width = percent(low);
+      rangeBar.style.left = percent(used + low); rangeBar.style.width = percent(Math.max(0, high - low));
+      memoryBar.setAttribute('aria-label', `总内存 ${total} MiB，当前已用 ${used} MiB，游戏预算 ${low} 至 ${high} MiB`);
+      usedBar.title = `当前已用 ${formatNumber(used)} MiB`;
+      minBar.title = `游戏最小值 ${formatNumber(low)} MiB`; rangeBar.title = `可增长至 ${formatNumber(high)} MiB`;
+      memoryWarning.hidden = high <= currentMemory.availableMB && low <= high;
+      text(memoryWarning, low > high ? '最小内存不能大于最大内存。' : '游戏最大内存超过当前可用量，可能引发系统换页或启动失败。建议降低预算或关闭其他程序。');
+      text(memoryHint, `当前已用 ${(used / 1024).toFixed(1)} GiB，可用 ${(currentMemory.availableMB / 1024).toFixed(1)} GiB。游戏区间表示堆内存预算，并非已经占用；Java 进程还需额外内存。推荐值会在启动时重新计算。`);
+    }
+  }
+  async function load() {
+    busy = true; update(); showError(error, null);
+    try {
+      const result = await invokePanel(plugin, panel, panel.loadAction, versionId);
+      if (disposed) return;
+      if (!result?.values) throw new Error('插件未返回启动配置');
+      memory = result.memory; apply(result.values); loaded = true; dirty = false;
+      text(status, '已读取启动配置');
+      if (result.memoryError) showError(error, result.memoryError);
+    } catch (failure) { loaded = false; if (!disposed) { showError(error, failure); text(status, '读取失败，可重新读取'); } throw failure; }
+    finally { busy = false; if (!disposed) update(); }
+  }
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    if (!loaded || busy || !form.reportValidity()) return;
+    if (number(minimum.value) > number(maximum.value)) { showError(error, '最小内存不能大于最大内存'); return; }
+    const submitted = values();
+    perform(save, '保存中', async () => {
+      busy = true; update();
+      try {
+        const result = await invokePanel(plugin, panel, panel.submitAction, versionId, {values: submitted});
+        if (disposed) return;
+        if (!result?.values) throw new Error('插件未返回保存后的配置');
+        memory = result.memory; apply(result.values); dirty = false;
+        text(status, '启动配置已保存'); status.classList.add('is-success');
+        await refreshState(true);
+      } finally { busy = false; if (!disposed) update(); }
+    }, { errorTarget: error, success: '启动配置已保存' });
+  });
+  perform(reload, '读取中', load, { errorTarget: error });
+  return { update, dispose: () => { disposed = true; } };
+}
+
+function renderProfiles(root, plugin, panel) {
+  let disposed = false, busy = false, loaded = false;
+  const error = inlineError(), cards = h('div', { class: 'profile-grid' });
+  const name = h('input', { type: 'text', name: 'playerName', placeholder: '例如 Alex', maxlength: '16', pattern: '[A-Za-z0-9_]{1,16}', required: true, autocomplete: 'off', disabled: true });
+  const create = button(panel.submitLabel || '新建玩家档案', 'plus', 'btn-primary', null, { type: 'submit', disabled: true });
+  const status = h('p', { class: 'field-hint', role: 'status' });
+  const refresh = button('重新读取', 'refresh', 'btn-sm', control => perform(control, '读取中', () => run(panel.loadAction), { errorTarget: error }));
+  const form = h('form', { class: 'surface card profile-create' }, cardHeading('新建离线玩家', '创建后自动设为当前档案。', 'user'), field('玩家名称', name, '1–16 位英文字母、数字或下划线。', true), create, status);
+  root.append(h('div', { class: 'alert alert-info profile-notice' }, icon('shield'), h('div', {}, h('strong', {}, '当前仅支持本地离线登录'), h('p', {}, '无法通过正版服务器身份验证。切换玩家名称会改变离线 UUID，可能影响存档中的背包、进度和玩家归属；档案管理不会改写这些存档。'))), error, h('div', { class: 'profiles-toolbar' }, h('h2', {}, '已保存的玩家'), refresh), cards, form);
+  function show(result) {
+    if (!Array.isArray(result?.profiles) || !result.profiles.some(profile => profile.id === result.selectedId)) throw new Error('插件返回的玩家档案不完整');
+    preserveFocusReplace(cards, ...result.profiles.map(profile => {
+      const selected = profile.id === result.selectedId;
+      const select = button(selected ? '正在使用' : '使用此档案', selected ? 'check' : 'user', selected ? 'btn-sm btn-primary' : 'btn-sm', control => perform(control, '切换中', () => run(panel.selectAction, {id: profile.id}), { errorTarget: error, success: '已切换玩家档案' }), {disabled: selected, 'data-focus-key': `profile-${profile.id}`});
+      const remove = iconButton(`移除玩家 ${profile.name}`, 'trash', () => confirmation({ title: '移除这个玩家档案？', description: profile.name, explanation: `仅移除启动器中的档案，保留所有游戏存档。${selected ? '移除后将切换到另一个保留的档案。' : ''}`, label: '移除档案', action: () => run(panel.removeAction, {id: profile.id}), success: '玩家档案已移除' }));
+      remove.disabled = result.profiles.length <= 1;
+      return h('article', { class: `surface profile-card ${selected ? 'is-selected' : ''}` }, h('div', { class: 'profile-card-head' }, h('span', { class: 'profile-avatar' }, icon('user')), h('div', {}, h('h3', {}, profile.name), h('p', {}, '本地离线玩家')), selected ? pill('当前档案', 'running') : null), h('div', { class: 'profile-uuid' }, h('span', {}, '离线 UUID'), h('code', {}, profile.uuid)), h('div', { class: 'profile-card-actions' }, select, remove));
+    }));
+  }
+  function update() {
+    name.disabled = !loaded || busy;
+    if (!create.dataset.busy) create.disabled = !loaded || busy;
+    if (!refresh.dataset.busy) refresh.disabled = busy;
+    for (const control of cards.querySelectorAll('button')) control.disabled = busy || control.dataset.fixedDisabled === 'true';
+  }
+  async function run(action, data) {
+    if (busy) throw new Error('请等待当前档案操作完成');
+    busy = true; update(); showError(error, null);
+    try {
+      const result = await invokePanel(plugin, panel, action, '', data);
+      if (disposed) return;
+      show(result); loaded = true;
+      for (const control of cards.querySelectorAll('button')) control.dataset.fixedDisabled = str(control.disabled);
+      text(status, `所有版本将使用 ${result.profiles.find(profile => profile.id === result.selectedId).name}。已运行的游戏保留原身份。`);
+      await refreshState(true);
+    } finally { busy = false; if (!disposed) update(); }
+  }
+  form.addEventListener('submit', event => {
+    event.preventDefault(); if (!loaded || busy || !form.reportValidity()) return;
+    const submitted = name.value.trim();
+    perform(create, '创建中', async () => { await run(panel.submitAction, {name: submitted}); if (!disposed) name.value = ''; }, { errorTarget: error, success: '玩家档案已创建并选中' });
+  });
+  perform(refresh, '读取中', () => run(panel.loadAction), { errorTarget: error });
+  return { update, dispose: () => { disposed = true; } };
+}
+
 function renderPlugins(root) {
   const reload = button('重新扫描插件', 'refresh', 'btn-primary', control => perform(control, '扫描中', async () => { await invoke('plugins.reload'); await refreshState(true); }, { success: '已重新扫描用户插件' }));
   setHeader('插件管理', 'SMALL CORE. OPEN POSSIBILITIES.', '小而专注的核心，按需扩展的能力。', [reload]);
@@ -786,12 +953,11 @@ function renderTasks(root) {
   update(); return { update };
 }
 function renderLogs(root, initialId) {
-  setHeader('运行日志', 'A WINDOW INTO YOUR GAME.', '查看游戏的原始输出。日志与运行状态每 1.5 秒更新。');
-  let id = initialId || '', disposed = false, busy = false, versionsSignature = '', emptySignature = '', linesText = '', lastResult = null;
-  const select = h('select', { class: 'select', id: 'log-version', onchange: event => navigate(logsHash(event.target.value)) });
+  const id = initialId;
+  let disposed = false, busy = false, emptySignature = '', linesText = '', lastResult = null;
   const refresh = button('刷新日志', 'refresh', '', control => perform(control, '读取中', load));
   const folder = button('游戏目录', 'folder-open', '', control => perform(control, '打开中', () => invoke('desktop.openFolder', { id }), { success: '已请求打开游戏目录' }));
-  const toolbar = h('div', { class: 'workspace-toolbar' }, h('div', { class: 'logs-select' }, h('label', { for: select.id }, '查看版本'), select), h('div', { class: 'toolbar-inputs' }, folder, refresh));
+  const toolbar = h('div', { class: 'workspace-toolbar' }, h('p', { class: 'field-hint' }, '当前版本的原始输出 · 每 1.5 秒更新'), h('div', { class: 'toolbar-inputs' }, folder, refresh));
   const error = inlineError(); const noVersion = h('div');
   const title = h('span', { class: 'log-title' }); const status = pill('尚未读取');
   const output = h('pre', { class: 'log-output', tabindex: '0', 'aria-label': '游戏日志输出' });
@@ -802,15 +968,10 @@ function renderLogs(root, initialId) {
   const workspace = h('section', { class: 'log-workspace' }, h('div', { class: 'log-toolbar' }, icon('terminal'), title, status, copy), output, h('div', { class: 'log-footer' }, count, h('label', { class: 'checkbox-row' }, pause, '暂停自动读取'), h('label', { class: 'checkbox-row' }, follow, '跟随最新输出')));
   root.append(toolbar, error, noVersion, workspace, path);
   function update() {
-    const signature = JSON.stringify(state.versions.map(version => [version.id, version.name]));
-    if (signature !== versionsSignature) {
-      versionsSignature = signature;
-      select.replaceChildren(h('option', { value: '' }, '选择要查看的版本'), ...state.versions.map(version => h('option', { value: version.id }, version.name || version.id))); select.value = id;
-    }
     const version = findVersion(id); const available = Boolean(version);
     workspace.hidden = !available; path.hidden = !available; noVersion.hidden = available;
     if (!refresh.dataset.busy) refresh.disabled = !available || busy;
-    if (!folder.dataset.busy) folder.disabled = !available; select.disabled = !state.versions.length;
+    if (!folder.dataset.busy) folder.disabled = !available;
     const nextEmpty = `${Boolean(available)}|${id}|${state.versions.length}`;
     if (!available && nextEmpty !== emptySignature) noVersion.replaceChildren(emptyState('terminal', id ? '此版本记录已不可用' : state.versions.length ? '选择一个版本，查看它的输出' : '还没有可查看的日志', state.versions.length ? '已结束的游戏日志也可以查看，具体内容以启动器保留的日志为准。' : '先导入或安装游戏版本，再启动一次游戏。日志会在这里呈现。', !state.versions.length ? link('返回版本库', '#library', 'btn', 'arrow-left') : null));
     emptySignature = nextEmpty;

@@ -35,9 +35,16 @@ func DefaultOptions() LaunchOptions {
 
 var playerPattern = regexp.MustCompile(`^[A-Za-z0-9_]{1,16}$`)
 
-func (o LaunchOptions) Validate() error {
-	if !playerPattern.MatchString(o.PlayerName) {
+func ValidatePlayerName(name string) error {
+	if !playerPattern.MatchString(name) {
 		return errors.New("离线名称只能使用 1–16 个字母、数字或下划线")
+	}
+	return nil
+}
+
+func (o LaunchOptions) Validate() error {
+	if err := ValidatePlayerName(o.PlayerName); err != nil {
+		return err
 	}
 	if o.MinMemoryMB < 128 || o.MaxMemoryMB < o.MinMemoryMB || o.MaxMemoryMB > 262144 {
 		return errors.New("内存须满足 128 ≤ 最小值 ≤ 最大值 ≤ 262144 MiB")

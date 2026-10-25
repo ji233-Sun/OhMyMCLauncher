@@ -23,6 +23,7 @@ try {
     & $GoExe build -trimpath -ldflags '-s -w -H=windowsgui' -o '.\dist\OhMyMC.exe' ./cmd/ohmymc
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     $ErrorActionPreference = 'Stop'
+    & (Join-Path $PSScriptRoot 'embed-icon.ps1') -Executable '.\dist\OhMyMC.exe'
     Copy-Item '.\README.md', '.\AGENTS.md', '.\LICENSE', '.\THIRD_PARTY_NOTICES.md' '.\dist' -Force
     Copy-Item '.\docs', '.\licenses' '.\dist' -Recurse -Force
     Write-Host 'Built dist\OhMyMC.exe (Windows desktop, embedded WebUI and plugins).'

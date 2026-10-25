@@ -7,7 +7,7 @@
   <meta name="api-token" content="__API_TOKEN__">
   <meta name="description" content="OhMyMC · 由插件驱动的本地 Minecraft 启动工作区">
   <title>OhMyMC · 版本库</title>
-  <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
+  <link rel="icon" href="./assets/app-icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -22,7 +22,6 @@
       <nav id="workspace-nav" class="nav-list" aria-label="工作空间">
         <a class="nav-link is-active" href="#library" data-page="library" aria-current="page"><span class="nav-icon" data-icon="grid"></span><span class="nav-label">版本库</span><span class="nav-count" id="version-count">—</span></a>
         <a class="nav-link" href="#tasks" data-page="tasks"><span class="nav-icon" data-icon="activity"></span><span class="nav-label">下载与任务</span><span class="nav-count" id="task-count" hidden>0</span></a>
-        <a class="nav-link" href="#logs" data-page="logs"><span class="nav-icon" data-icon="terminal"></span><span class="nav-label">运行日志</span><span class="nav-running" id="running-dot" hidden aria-label="有版本正在运行"></span></a>
       </nav>
       <div class="sidebar-section-label extension-label">插件扩展 <span>EXTENSIONS</span></div>
       <nav id="panel-nav" class="nav-list" aria-label="插件面板"></nav>
@@ -32,8 +31,8 @@
       </nav>
       <div class="sidebar-bottom">
         <div class="sidebar-note"><span class="note-rule"></span><p>轻盈的启动器。<br>属于你的游戏方式。</p><span class="note-coordinate">BUILD YOUR OWN WAY</span></div>
-        <button id="identity-button" class="identity-card" type="button" aria-label="查看本地离线身份说明">
-          <span class="identity-avatar" data-icon="user"></span><span class="identity-copy"><strong>本地离线身份</strong><small>无需登录 · 本地启动</small></span><span class="identity-info" data-icon="info"></span>
+        <button id="identity-button" class="identity-card" type="button" aria-label="管理当前玩家档案">
+          <span class="identity-avatar" data-icon="user"></span><span class="identity-copy"><strong id="identity-name">Player</strong><small id="identity-caption">离线玩家 · 切换档案</small></span><span class="identity-info" data-icon="chevron-right"></span>
         </button>
         <div class="sidebar-meta"><span id="app-version">OhMyMC</span><span id="platform-label">LOCAL FIRST</span></div>
       </div>

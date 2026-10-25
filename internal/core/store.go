@@ -33,6 +33,8 @@ type database struct {
 	Versions []Version                             `json:"versions"`
 	Enabled  map[string]bool                       `json:"enabled"`
 	Settings map[string]map[string]json.RawMessage `json:"settings"`
+	Global   map[string]json.RawMessage            `json:"global,omitempty"`
+	Ignored  map[string]bool                       `json:"ignored,omitempty"`
 }
 type Store struct {
 	mu            sync.RWMutex
@@ -79,6 +81,12 @@ func NewStoreWithMinecraftRoot(root, minecraftRoot string) (*Store, error) {
 	}
 	if s.db.Settings == nil {
 		s.db.Settings = map[string]map[string]json.RawMessage{}
+	}
+	if s.db.Global == nil {
+		s.db.Global = map[string]json.RawMessage{}
+	}
+	if s.db.Ignored == nil {
+		s.db.Ignored = map[string]bool{}
 	}
 	if s.db.Versions == nil {
 		s.db.Versions = []Version{}
@@ -150,6 +158,7 @@ func (s *Store) Add(v Version) (Version, error) {
 		if v.ID == "" {
 			v.ID = safefile.ID()
 		}
+		delete(s.db.Ignored, discoveryKey(v.Directory, v.VersionID))
 		v.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 		s.db.Versions = append(s.db.Versions, v)
 		return nil
@@ -179,6 +188,7 @@ func (s *Store) Remove(id string) error {
 	return s.mutate(func() error {
 		for i, v := range s.db.Versions {
 			if v.ID == id {
+				s.db.Ignored[discoveryKey(v.Directory, v.VersionID)] = true
 				s.db.Versions = append(s.db.Versions[:i], s.db.Versions[i+1:]...)
 				delete(s.db.Settings, id)
 				return nil
@@ -232,6 +242,25 @@ func (s *Store) SetSetting(version, plugin string, b json.RawMessage) error {
 			s.db.Settings[version] = map[string]json.RawMessage{}
 		}
 		s.db.Settings[version][plugin] = append(json.RawMessage{}, b...)
+		return nil
+	})
+}
+
+func (s *Store) GlobalSetting(plugin string) json.RawMessage {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if b := s.db.Global[plugin]; len(b) != 0 {
+		return append(json.RawMessage{}, b...)
+	}
+	return json.RawMessage(`{}`)
+}
+
+func (s *Store) SetGlobalSetting(plugin string, b json.RawMessage) error {
+	if len(b) > 65536 || !json.Valid(b) {
+		return errors.New("插件配置过大或不是有效 JSON")
+	}
+	return s.mutate(func() error {
+		s.db.Global[plugin] = append(json.RawMessage{}, b...)
 		return nil
 	})
 }
@@ -290,6 +319,7 @@ func (s *Store) Import(path string) ([]Version, error) {
 	added := []Version{}
 	err = s.mutate(func() error {
 		for _, v := range candidates {
+			delete(s.db.Ignored, discoveryKey(v.Directory, v.VersionID))
 			exists := false
 			for _, old := range s.db.Versions {
 				if old.Directory == v.Directory && old.VersionID == v.VersionID {
